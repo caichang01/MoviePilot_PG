@@ -7,7 +7,8 @@ ENV LANG="C.UTF-8" \
     DISPLAY=:987 \
     PUID=0 \
     PGID=0 \
-    UMASK=000
+    UMASK=000 \
+    DATABASE_URL="postgresql://postgres:postgres@postgres:5432/moviepilot"
 WORKDIR "/app"
 RUN apt-get update -y \
     && apt-get upgrade -y \
