@@ -62,7 +62,7 @@ class Site(Base):
     @staticmethod
     @db_query
     def get_actives(db: Session):
-        return db.query(Site).filter(Site.is_active == 1).all()
+        return db.query(Site).filter(Site.is_active == True).all()
 
     @staticmethod
     @db_query

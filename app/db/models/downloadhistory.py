@@ -223,7 +223,7 @@ class DownloadFiles(Base):
     @db_update
     def delete_by_fullpath(db: Session, fullpath: str):
         db.query(DownloadFiles).filter(DownloadFiles.fullpath == fullpath,
-                                       DownloadFiles.state == 1).update(
+                                       DownloadFiles.state == True).update(
             {
                 "state": 0
             }
