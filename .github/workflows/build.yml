@@ -51,6 +51,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # >>> 新增：登录私有镜像仓库 registry.caichang01.cn
+      - name: Login Private Registry (registry.caichang01.cn)
+        uses: docker/login-action@v3
+        with:
+          registry: registry.caichang01.cn
+          username: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
+          password: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
+      # <<< 新增结束
+
       - name: Build Image
         uses: docker/build-push-action@v5
         with:
@@ -60,7 +69,11 @@ jobs:
             linux/amd64
             linux/arm64/v8
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            # >>> 新增 tag 支持推送到私有仓库
+            registry.caichang01.cn/moviepilot-v2-pg:${{ env.app_version }}
+            # <<< 新增结束
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}-docker
           cache-to: type=gha, scope=${{ github.workflow }}-docker
