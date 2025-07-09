@@ -26,8 +26,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ secrets.DOCKER_USERNAME }}/moviepilot-v2-pg
-            ghcr.io/${{ github.repository }}
+            registry.caichang01.cn/moviepilot-v2-pg
           tags: |
             type=raw,value=${{ env.app_version }}
             type=raw,value=latest
@@ -38,18 +37,6 @@ jobs:
       - name: Set Up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Login GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       # >>> 新增：登录私有镜像仓库 registry.caichang01.cn
       - name: Login Private Registry (registry.caichang01.cn)
@@ -70,7 +57,6 @@ jobs:
             linux/arm64/v8
           push: true
           tags: |
-            ${{ steps.meta.outputs.tags }}
             registry.caichang01.cn/moviepilot-v2-pg:${{ env.app_version }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}-docker
