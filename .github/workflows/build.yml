@@ -26,7 +26,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ secrets.PRIVATE_REGISTRY_URL }}/moviepilot-v2-pg
+            ${{ secrets.PRIVATE_REGISTRY_URL }}/caichang01_registry/moviepilot_pg
           tags: |
             type=raw,value=${{ env.app_version }}
             type=raw,value=latest
@@ -39,10 +39,10 @@ jobs:
 
 
       # >>> 新增：登录私有镜像仓库 registry.caichang01.cn
-      - name: Login Private Registry (registry.caichang01.cn)
+      - name: Login Private Registry (${{ secrets.PRIVATE_REGISTRY_URL }})
         uses: docker/login-action@v3
         with:
-          registry: registry.caichang01.cn
+          registry: ${{ secrets.PRIVATE_REGISTRY_URL }}
           username: ${{ secrets.PRIVATE_REGISTRY_USERNAME }}
           password: ${{ secrets.PRIVATE_REGISTRY_PASSWORD }}
       # <<< 新增结束
