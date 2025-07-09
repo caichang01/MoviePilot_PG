@@ -9,7 +9,7 @@ on:
 
 jobs:
   Docker-build:
-    runs-on: [self-hosted, caichang01-PC]
+    runs-on: ubuntu-latest
     name: Build Docker Image
     steps:
       - name: Checkout
