@@ -530,7 +530,14 @@ class FileManagerModule(_ModuleBase):
                                                     mediainfo=mediainfo)
             )
             # 计算重命名中的文件夹层数
-            rename_format_level = len(rename_format.split("/")) - 1
+            rename_list = rename_format.split("/")
+            rename_format_level = len(rename_list) - 1
+            for level, name in enumerate(rename_list):
+                # 处理特例，有的人重命名第一层是年份、分辨率
+                if "{{title}}" in name:
+                    # 找出含标题的这一层作为扫描路径
+                    rename_format_level -= level
+                    break
             # 取相对路径的第1层目录
             media_path = target_path.parents[rename_format_level - 1]
             if dir_path.is_relative_to(media_path):
@@ -562,9 +569,12 @@ class FileManagerModule(_ModuleBase):
         if not settings.LOCAL_EXISTS_SEARCH:
             return None
 
+        logger.debug(f"正在本地媒体库中查找 {mediainfo.title_year}...")
+
         # 检查媒体库
         fileitems = self.media_files(mediainfo)
         if not fileitems:
+            logger.debug(f"{mediainfo.title_year} 不在本地媒体库中")
             return None
 
         if mediainfo.type == MediaType.MOVIE:
