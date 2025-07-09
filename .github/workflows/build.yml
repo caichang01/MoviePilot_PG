@@ -26,7 +26,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            registry.caichang01.cn/moviepilot-v2-pg
+            ${{ secrets.PRIVATE_REGISTRY_URL }}/moviepilot-v2-pg
           tags: |
             type=raw,value=${{ env.app_version }}
             type=raw,value=latest
@@ -57,7 +57,7 @@ jobs:
             linux/arm64/v8
           push: true
           tags: |
-            registry.caichang01.cn/moviepilot-v2-pg:${{ env.app_version }}
+            ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}-docker
           cache-to: type=gha, scope=${{ github.workflow }}-docker
