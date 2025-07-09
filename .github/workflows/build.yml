@@ -71,9 +71,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            # >>> 新增 tag 支持推送到私有仓库
             registry.caichang01.cn/moviepilot-v2-pg:${{ env.app_version }}
-            # <<< 新增结束
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha, scope=${{ github.workflow }}-docker
           cache-to: type=gha, scope=${{ github.workflow }}-docker
