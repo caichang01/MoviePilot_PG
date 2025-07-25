@@ -29,6 +29,8 @@ class SubscribeHelper(metaclass=WeakSingleton):
 
     _sub_shares = f"{settings.MP_SERVER_HOST}/subscribe/shares"
 
+    _sub_share_statistic = f"{settings.MP_SERVER_HOST}/subscribe/share/statistics"
+
     _sub_fork = f"{settings.MP_SERVER_HOST}/subscribe/fork/%s"
 
     _shares_cache_region = "subscribe_share"
@@ -199,7 +201,7 @@ class SubscribeHelper(metaclass=WeakSingleton):
         else:
             return False, res.json().get("message")
 
-    @cached(region=_shares_cache_region)
+    @cached(region=_shares_cache_region, maxsize=1, ttl=1800, skip_empty=True)
     def get_shares(self, name: Optional[str] = None, page: Optional[int] = 1, count: Optional[int] = 30) -> List[dict]:
         """
         获取订阅分享数据
@@ -211,6 +213,18 @@ class SubscribeHelper(metaclass=WeakSingleton):
             "page": page,
             "count": count
         })
+        if res and res.status_code == 200:
+            return res.json()
+        return []
+
+    @cached(region=_shares_cache_region, maxsize=1, ttl=1800, skip_empty=True)
+    def get_share_statistics(self) -> List[dict]:
+        """
+        获取订阅分享统计数据
+        """
+        if not settings.SUBSCRIBE_STATISTIC_SHARE:
+            return []
+        res = RequestUtils(proxies=settings.PROXY, timeout=15).get_res(self._sub_share_statistic)
         if res and res.status_code == 200:
             return res.json()
         return []

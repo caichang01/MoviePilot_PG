@@ -1,6 +1,8 @@
 import copy
 import json
 import os
+import platform
+import re
 import secrets
 import sys
 import threading
@@ -11,8 +13,10 @@ from dotenv import set_key
 from pydantic import BaseModel, BaseSettings, validator, Field
 
 from app.log import logger, log_settings, LogConfigModel
+from app.schemas import MediaType
 from app.utils.system import SystemUtils
 from app.utils.url import UrlUtils
+from version import APP_VERSION
 
 
 class SystemConfModel(BaseModel):
@@ -211,6 +215,8 @@ class ConfigModel(BaseModel):
     SITEDATA_REFRESH_INTERVAL: int = 6
     # 读取和发送站点消息
     SITE_MESSAGE: bool = True
+    # 不能缓存站点资源的站点域名，多个使用,分隔
+    NO_CACHE_SITE_KEY: str = "m-team"
     # 种子标签
     TORRENT_TAG: str = "MOVIEPILOT"
     # 下载站点字幕
@@ -229,8 +235,6 @@ class ConfigModel(BaseModel):
     COOKIECLOUD_INTERVAL: Optional[int] = 60 * 24
     # CookieCloud同步黑名单，多个域名,分割
     COOKIECLOUD_BLACKLIST: Optional[str] = None
-    # CookieCloud对应的浏览器UA
-    USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.57"
     # 电影重命名格式
     MOVIE_RENAME_FORMAT: str = "{{title}}{% if year %} ({{year}}){% endif %}" \
                                "/{{title}}{% if year %} ({{year}}){% endif %}{% if part %}-{{part}}{% endif %}{% if videoFormat %} - {{videoFormat}}{% endif %}" \
@@ -507,6 +511,20 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
         return "v2"
 
     @property
+    def USER_AGENT(self) -> str:
+        """
+        全局用户代理字符串
+        """
+        return f"{self.PROJECT_NAME}/{APP_VERSION[1:]} ({platform.system()} {platform.release()}; {SystemUtils.cpu_arch()})"
+
+    @property
+    def NORMAL_USER_AGENT(self) -> str:
+        """
+        默认浏览器用户代理字符串
+        """
+        return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+
+    @property
     def INNER_CONFIG_PATH(self):
         return self.ROOT_PATH / "config"
 
@@ -602,7 +620,7 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
         if self.GITHUB_TOKEN:
             return {
                 "Authorization": f"Bearer {self.GITHUB_TOKEN}",
-                "User-Agent": self.USER_AGENT,
+                "User-Agent": self.NORMAL_USER_AGENT,
             }
         return {}
 
@@ -631,7 +649,7 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
                     continue
                 headers[repo_info] = {
                     "Authorization": f"Bearer {token}",
-                    "User-Agent": self.USER_AGENT,
+                    "User-Agent": self.NORMAL_USER_AGENT,
                 }
             except Exception as e:
                 print(f"处理令牌对 '{token_pair}' 时出错: {e}")
@@ -650,6 +668,23 @@ class Settings(BaseSettings, ConfigModel, LogConfigModel):
         if not self.APP_DOMAIN:
             return None
         return UrlUtils.combine_url(host=self.APP_DOMAIN, path=url)
+
+    def RENAME_FORMAT(self, media_type: MediaType):
+        """
+        获取指定类型的重命名格式
+
+        :param media_type: MediaType.TV 或 MediaType.Movie
+        :return: 重命名格式
+        """
+        rename_format = (
+            self.TV_RENAME_FORMAT
+            if media_type == MediaType.TV
+            else self.MOVIE_RENAME_FORMAT
+        )
+        # 规范重命名格式
+        rename_format = rename_format.replace("\\", "/")
+        rename_format = re.sub(r'/+', '/', rename_format)
+        return rename_format.strip("/")
 
 
 # 实例化配置

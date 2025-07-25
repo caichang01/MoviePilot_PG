@@ -451,9 +451,9 @@ class SubscribeChain(ChainBase):
                 self._rlock.release()
                 logger.debug(f"search Lock released at {datetime.now()}")
 
-        # 如果不是大内存模式，进行垃圾回收
-        if not settings.BIG_MEMORY_MODE:
-            gc.collect()
+            # 如果不是大内存模式，进行垃圾回收
+            if not settings.BIG_MEMORY_MODE:
+                gc.collect()
 
     def update_subscribe_priority(self, subscribe: Subscribe, meta: MetaBase,
                                   mediainfo: MediaInfo, downloads: Optional[List[Context]]):
@@ -558,10 +558,15 @@ class SubscribeChain(ChainBase):
         :return: 返回[]代表所有站点命中，返回None代表没有订阅
         """
         ret_sites = []
+        subscribes = SubscribeOper().list()
+        if not subscribes:
+            # 没有订阅
+            return None
         # 刷新订阅选中的Rss站点
-        for subscribe in SubscribeOper().list(self.get_states_for_search('R')):
+        for subscribe in subscribes:
             # 刷新选中的站点
-            ret_sites.extend(self.get_sub_sites(subscribe))
+            if subscribe.state in self.get_states_for_search('R'):
+                ret_sites.extend(self.get_sub_sites(subscribe))
         # 去重
         if ret_sites:
             ret_sites = list(set(ret_sites))
