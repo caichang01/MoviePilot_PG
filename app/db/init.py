@@ -38,9 +38,16 @@ def update_db():
     """
     执行数据库迁移
     """
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        logger.error("DATABASE_URL环境变量未设置")
+        return
+        
+    script_location = settings.ROOT_PATH / 'database'
     try:
         alembic_cfg = Config()
-        alembic_cfg.set_main_option('script_location', str(settings.ROOT_PATH / 'database'))
+        alembic_cfg.set_main_option('script_location', str(script_location))
+        alembic_cfg.set_main_option('sqlalchemy.url', db_url)
         upgrade(alembic_cfg, 'head')
     except Exception as e:
         logger.error(f'数据库更新失败：{str(e)}')
