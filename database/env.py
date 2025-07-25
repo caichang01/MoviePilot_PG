@@ -32,10 +32,18 @@ def run_migrations_online() -> None:
     if not db_url:
         raise ValueError("DATABASE_URL环境变量未设置")
         
+    # 根据数据库类型选择合适的poolclass
+    if db_url.startswith('postgresql'):
+        # PostgreSQL推荐使用QueuePool
+        pool_class = pool.QueuePool
+    else:
+        # 其他数据库使用NullPool
+        pool_class = pool.NullPool
+        
     connectable = engine_from_config(
         {"sqlalchemy.url": db_url},
         prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+        poolclass=pool_class,
     )
 
     with connectable.connect() as connection:

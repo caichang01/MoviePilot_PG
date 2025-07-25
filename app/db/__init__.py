@@ -8,8 +8,13 @@ from app.core.config import settings
 
 # 根据池类型设置 poolclass 和相关参数
 pool_class = NullPool if settings.DB_POOL_TYPE == "NullPool" else QueuePool
+# 从环境变量获取数据库URL，不设置默认值
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    raise ValueError("DATABASE_URL环境变量未设置")
+
 db_kwargs = {
-    "url": os.getenv("DATABASE_URL"),
+    "url": db_url,
     "pool_pre_ping": settings.DB_POOL_PRE_PING,
     "echo": settings.DB_ECHO,
     "poolclass": pool_class,
