@@ -1,3 +1,7 @@
 # Ignore git
 .github
 .git
+
+# Ignore generated SQL files
+database/check_db_version_generated.sql
+database/check_sql_*.sql
