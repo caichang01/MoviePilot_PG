@@ -24,6 +24,8 @@ def init_db():
     # 使用已存在的全局引擎
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=Engine)
 
+    Base.metadata.create_all(bind=Engine)
+
 def update_db():
     """
     执行数据库迁移
