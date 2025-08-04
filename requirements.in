@@ -6,7 +6,6 @@ fastapi~=0.115.14
 passlib~=1.7.4
 PyJWT~=2.10.1
 python-multipart~=0.0.9
-aiofiles~=24.1.0
 aioshutil~=1.5
 alembic~=1.16.2
 bcrypt~=4.0.1
@@ -61,7 +60,6 @@ pyotp~=2.9.0
 Pinyin2Hanzi~=0.1.1
 pywebpush~=2.0.3
 python-cookietools==0.0.4
-aiofiles~=24.1.0
 aiopath~=0.7.7
 asynctempfile~=0.5.0
 aiosqlite~=0.21.0
