@@ -1,5 +1,6 @@
 import os
 from typing import Any, Generator, List, Optional, Self, Tuple, Union, Sequence
+import asyncio
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -105,6 +106,18 @@ def get_db() -> Generator:
     finally:
         if db:
             db.close()
+
+
+async def get_async_db() -> AsyncSession:
+    """
+    获取异步数据库会话，用于异步WEB请求
+    :return: AsyncSession
+    """
+    db = AsyncSessionFactory()
+    try:
+        yield db
+    finally:
+        await db.close()
 
 
 def close_database():
