@@ -17,7 +17,7 @@ from app.db.models.subscribe import Subscribe
 from app.db.models.subscribehistory import SubscribeHistory
 from app.db.models.user import User
 from app.db.systemconfig_oper import SystemConfigOper
-from app.db.user_oper import get_current_active_user
+from app.db.user_oper import get_current_active_user_async
 from app.helper.subscribe import SubscribeHelper
 from app.scheduler import Scheduler
 from app.schemas.types import MediaType, EventType, SystemConfigKey
@@ -53,10 +53,10 @@ async def list_subscribes(_: Annotated[str, Depends(verify_apitoken)]) -> Any:
 
 
 @router.post("/", summary="新增订阅", response_model=schemas.Response)
-def create_subscribe(
+async def create_subscribe(
         *,
         subscribe_in: schemas.Subscribe,
-        current_user: User = Depends(get_current_active_user),
+        current_user: User = Depends(get_current_active_user_async),
 ) -> schemas.Response:
     """
     新增订阅
@@ -78,10 +78,10 @@ def create_subscribe(
         title = None
     # 订阅用户
     subscribe_in.username = current_user.name
-    sid, message = SubscribeChain().add(mtype=mtype,
-                                        title=title,
-                                        exist_ok=True,
-                                        **subscribe_in.dict())
+    sid, message = await SubscribeChain().async_add(mtype=mtype,
+                                                    title=title,
+                                                    exist_ok=True,
+                                                    **subscribe_in.dict())
     return schemas.Response(
         success=bool(sid), message=message, data={"id": sid}
     )
@@ -115,12 +115,15 @@ async def update_subscribe(
     # 是否手动修改过总集数
     if subscribe_in.total_episode != subscribe.total_episode:
         subscribe_dict["manual_total_episode"] = 1
+    # 更新到数据库
+    await subscribe.async_update(db, subscribe_dict)
+    # 重新获取更新后的订阅数据
+    updated_subscribe = await Subscribe.async_get(db, subscribe_in.id)
     # 发送订阅调整事件
-    subscribe = await subscribe.async_get(db, subscribe_in.id)
     await eventmanager.async_send_event(EventType.SubscribeModified, {
         "subscribe_id": subscribe_in.id,
         "old_subscribe_info": old_subscribe_dict,
-        "subscribe_info": subscribe.to_dict(),
+        "subscribe_info": updated_subscribe.to_dict() if updated_subscribe else {},
     })
     return schemas.Response(success=True)
 
@@ -144,11 +147,13 @@ async def update_subscribe_status(
     await subscribe.async_update(db, {
         "state": state
     })
+    # 重新获取更新后的订阅数据
+    updated_subscribe = await Subscribe.async_get(db, subid)
     # 发送订阅调整事件
-    eventmanager.async_send_event(EventType.SubscribeModified, {
-        "subscribe_id": subscribe.id,
+    await eventmanager.async_send_event(EventType.SubscribeModified, {
+        "subscribe_id": subid,
         "old_subscribe_info": old_subscribe_dict,
-        "subscribe_info": subscribe.to_dict(),
+        "subscribe_info": updated_subscribe.to_dict() if updated_subscribe else {},
     })
     return schemas.Response(success=True)
 
@@ -217,17 +222,21 @@ async def reset_subscribes(
     """
     subscribe = await Subscribe.async_get(db, subid)
     if subscribe:
+        # 在更新之前获取旧数据
         old_subscribe_dict = subscribe.to_dict()
+        # 更新订阅
         await subscribe.async_update(db, {
             "note": [],
             "lack_episode": subscribe.total_episode,
             "state": "R"
         })
+        # 重新获取更新后的订阅数据
+        updated_subscribe = await Subscribe.async_get(db, subid)
         # 发送订阅调整事件
-        eventmanager.async_send_event(EventType.SubscribeModified, {
-            "subscribe_id": subscribe.id,
+        await eventmanager.async_send_event(EventType.SubscribeModified, {
+            "subscribe_id": subid,
             "old_subscribe_info": old_subscribe_dict,
-            "subscribe_info": subscribe.to_dict(),
+            "subscribe_info": updated_subscribe.to_dict() if updated_subscribe else {},
         })
         return schemas.Response(success=True)
     return schemas.Response(success=False, message="订阅不存在")
@@ -311,11 +320,14 @@ async def delete_subscribe_by_mediaid(
         if subscribe:
             delete_subscribes.append(subscribe)
     for subscribe in delete_subscribes:
-        await Subscribe.async_delete(db, subscribe.id)
+        # 在删除之前获取订阅信息
+        subscribe_info = subscribe.to_dict()
+        subscribe_id = subscribe.id
+        await Subscribe.async_delete(db, subscribe_id)
         # 发送事件
-        eventmanager.async_send_event(EventType.SubscribeDeleted, {
-            "subscribe_id": subscribe.id,
-            "subscribe_info": subscribe.to_dict()
+        await eventmanager.async_send_event(EventType.SubscribeDeleted, {
+            "subscribe_id": subscribe_id,
+            "subscribe_info": subscribe_info
         })
     return schemas.Response(success=True)
 
@@ -495,9 +507,9 @@ async def subscribe_share_delete(
 
 
 @router.post("/fork", summary="复用订阅", response_model=schemas.Response)
-def subscribe_fork(
+async def subscribe_fork(
         sub: schemas.SubscribeShare,
-        current_user: User = Depends(get_current_active_user)) -> Any:
+        current_user: User = Depends(get_current_active_user_async)) -> Any:
     """
     复用订阅
     """
@@ -506,10 +518,10 @@ def subscribe_fork(
     for key in list(sub_dict.keys()):
         if not hasattr(schemas.Subscribe(), key):
             sub_dict.pop(key)
-    result = create_subscribe(subscribe_in=schemas.Subscribe(**sub_dict),
-                              current_user=current_user)
+    result = await create_subscribe(subscribe_in=schemas.Subscribe(**sub_dict),
+                                    current_user=current_user)
     if result.success:
-        SubscribeHelper().sub_fork(share_id=sub.id)
+        await SubscribeHelper().async_sub_fork(share_id=sub.id)
     return result
 
 
@@ -594,11 +606,13 @@ async def delete_subscribe(
     """
     subscribe = await Subscribe.async_get(db, subscribe_id)
     if subscribe:
+        # 在删除之前获取订阅信息
+        subscribe_info = subscribe.to_dict()
         await Subscribe.async_delete(db, subscribe_id)
         # 发送事件
-        eventmanager.async_send_event(EventType.SubscribeDeleted, {
+        await eventmanager.async_send_event(EventType.SubscribeDeleted, {
             "subscribe_id": subscribe_id,
-            "subscribe_info": subscribe.to_dict()
+            "subscribe_info": subscribe_info
         })
         # 统计订阅
         SubscribeHelper().sub_done_async({
