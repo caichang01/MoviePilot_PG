@@ -8,7 +8,7 @@ from app import schemas
 from app.chain.user import UserChain
 from app.core import security
 from app.core.config import settings
-from app.helper.sites import SitesHelper
+from app.helper.sites import SitesHelper  # noqa
 from app.helper.wallpaper import WallpaperHelper
 
 router = APIRouter()
@@ -44,7 +44,7 @@ def login_access_token(
         user_name=user_or_message.name,
         avatar=user_or_message.avatar,
         level=level,
-        permissions= user_or_message.permissions or {},
+        permissions=user_or_message.permissions or {},
     )
 
 

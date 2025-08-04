@@ -1,5 +1,4 @@
 import copy
-import gc
 import json
 import random
 import threading
@@ -16,7 +15,7 @@ from app.chain.tmdb import TmdbChain
 from app.chain.torrents import TorrentsChain
 from app.core.config import settings, global_vars
 from app.core.context import TorrentInfo, Context, MediaInfo
-from app.core.event import eventmanager, Event, EventManager
+from app.core.event import eventmanager, Event
 from app.core.meta import MetaBase
 from app.core.meta.words import WordsMatcher
 from app.core.metainfo import MetaInfo
@@ -238,7 +237,7 @@ class SubscribeChain(ChainBase):
                 username=username
             )
         # 发送事件
-        EventManager().send_event(EventType.SubscribeAdded, {
+        eventmanager.send_event(EventType.SubscribeAdded, {
             "subscribe_id": sid,
             "username": username,
             "mediainfo": mediainfo.to_dict(),
@@ -284,7 +283,7 @@ class SubscribeChain(ChainBase):
         lock_acquired = False
         try:
             if lock_acquired := self._rlock.acquire(
-                blocking=True, timeout=self._LOCK_TIMOUT
+                    blocking=True, timeout=self._LOCK_TIMOUT
             ):
                 logger.debug(f"search lock acquired at {datetime.now()}")
             else:
@@ -451,10 +450,6 @@ class SubscribeChain(ChainBase):
                 self._rlock.release()
                 logger.debug(f"search Lock released at {datetime.now()}")
 
-            # 如果不是大内存模式，进行垃圾回收
-            if not settings.BIG_MEMORY_MODE:
-                gc.collect()
-
     def update_subscribe_priority(self, subscribe: Subscribe, meta: MetaBase,
                                   mediainfo: MediaInfo, downloads: Optional[List[Context]]):
         """
@@ -526,9 +521,6 @@ class SubscribeChain(ChainBase):
         self.match(
             TorrentsChain().refresh(sites=sites)
         )
-        # 如果不是大内存模式，进行垃圾回收
-        if not settings.BIG_MEMORY_MODE:
-            gc.collect()
 
     @staticmethod
     def get_sub_sites(subscribe: Subscribe) -> List[int]:
@@ -584,7 +576,7 @@ class SubscribeChain(ChainBase):
         lock_acquired = False
         try:
             if lock_acquired := self._rlock.acquire(
-                blocking=True, timeout=self._LOCK_TIMOUT
+                    blocking=True, timeout=self._LOCK_TIMOUT
             ):
                 logger.debug(f"match lock acquired at {datetime.now()}")
             else:
@@ -829,7 +821,8 @@ class SubscribeChain(ChainBase):
                                                                       username=subscribe.username,
                                                                       save_path=subscribe.save_path,
                                                                       downloader=subscribe.downloader,
-                                                                      source=self.get_subscribe_source_keyword(subscribe)
+                                                                      source=self.get_subscribe_source_keyword(
+                                                                          subscribe)
                                                                       )
 
                     # 同步外部修改，更新订阅信息
@@ -1097,7 +1090,7 @@ class SubscribeChain(ChainBase):
             username=subscribe.username
         )
         # 发送事件
-        EventManager().send_event(EventType.SubscribeComplete, {
+        eventmanager.send_event(EventType.SubscribeComplete, {
             "subscribe_id": subscribe.id,
             "subscribe_info": subscribe.to_dict(),
             "mediainfo": mediainfo.to_dict(),

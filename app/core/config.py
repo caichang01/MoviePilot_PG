@@ -211,6 +211,8 @@ class ConfigModel(BaseModel):
     LOCAL_EXISTS_SEARCH: bool = False
     # 搜索多个名称
     SEARCH_MULTIPLE_NAME: bool = False
+    # 最大搜索名称数量
+    MAX_SEARCH_NAME_LIMIT: int = 2
     # 站点数据刷新间隔（小时）
     SITEDATA_REFRESH_INTERVAL: int = 6
     # 读取和发送站点消息
@@ -278,6 +280,8 @@ class ConfigModel(BaseModel):
     REPO_GITHUB_TOKEN: Optional[str] = None
     # 大内存模式
     BIG_MEMORY_MODE: bool = False
+    # FastApi性能监控
+    PERFORMANCE_MONITOR_ENABLE: bool = False
     # 全局图片缓存，将媒体图片缓存到本地
     GLOBAL_IMAGE_CACHE: bool = False
     # 是否启用编码探测的性能模式
@@ -311,6 +315,10 @@ class ConfigModel(BaseModel):
     DOCKER_CLIENT_API: Optional[str] = "tcp://127.0.0.1:38379"
     # 工作流数据共享
     WORKFLOW_STATISTIC_SHARE: bool = True
+    # 对rclone进行快照对比时，是否检查文件夹的修改时间
+    RCLONE_SNAPSHOT_CHECK_FOLDER_MODTIME = True
+    # 对OpenList进行快照对比时，是否检查文件夹的修改时间
+    OPENLIST_SNAPSHOT_CHECK_FOLDER_MODTIME = True
 
 
 class Settings(BaseSettings, ConfigModel, LogConfigModel):

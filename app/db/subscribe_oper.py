@@ -48,7 +48,8 @@ class SubscribeOper(DbOper):
         else:
             return subscribe.id, "订阅已存在"
 
-    def exists(self, tmdbid: Optional[int] = None, doubanid: Optional[str] = None, season: Optional[int] = None) -> bool:
+    def exists(self, tmdbid: Optional[int] = None, doubanid: Optional[str] = None,
+               season: Optional[int] = None) -> bool:
         """
         判断是否存在
         """
@@ -66,6 +67,12 @@ class SubscribeOper(DbOper):
         获取订阅
         """
         return Subscribe.get(self._db, rid=sid)
+
+    async def async_get(self, sid: int) -> Subscribe:
+        """
+        获取订阅
+        """
+        return await Subscribe.async_get(self._db, id=sid)
 
     def list(self, state: Optional[str] = None) -> List[Subscribe]:
         """
@@ -96,7 +103,8 @@ class SubscribeOper(DbOper):
         """
         return Subscribe.get_by_tmdbid(self._db, tmdbid=tmdbid, season=season)
 
-    def list_by_username(self, username: str, state: Optional[str] = None, mtype: Optional[str] = None) -> List[Subscribe]:
+    def list_by_username(self, username: str, state: Optional[str] = None,
+                         mtype: Optional[str] = None) -> List[Subscribe]:
         """
         获取指定用户的订阅
         """

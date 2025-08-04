@@ -890,7 +890,7 @@ class TransferChain(ChainBase, metaclass=Singleton):
                     state, errmsg = self.do_transfer(
                         fileitem=FileItem(
                             storage="local",
-                            path=str(file_path).replace("\\", "/"),
+                            path=file_path.as_posix(),
                             type="dir" if not file_path.is_file() else "file",
                             name=file_path.name,
                             size=file_path.stat().st_size,
@@ -909,10 +909,6 @@ class TransferChain(ChainBase, metaclass=Singleton):
             finally:
                 torrents.clear()
                 del torrents
-
-            # 如果不是大内存模式，进行垃圾回收
-            if not settings.BIG_MEMORY_MODE:
-                gc.collect()
 
             # 结束
             logger.info("所有下载器中下载完成的文件已整理完成")
@@ -1386,7 +1382,8 @@ class TransferChain(ChainBase, metaclass=Singleton):
             mediainfo: MediaInfo = MediaChain().recognize_media(tmdbid=tmdbid, doubanid=doubanid,
                                                                 mtype=mtype, episode_group=episode_group)
             if not mediainfo:
-                return False, f"媒体信息识别失败，tmdbid：{tmdbid}，doubanid：{doubanid}，type: {mtype.value}"
+                return (False,
+                        f"媒体信息识别失败，tmdbid：{tmdbid}，doubanid：{doubanid}，type: {mtype.value if mtype else None}")
             else:
                 # 更新媒体图片
                 self.obtain_images(mediainfo=mediainfo)

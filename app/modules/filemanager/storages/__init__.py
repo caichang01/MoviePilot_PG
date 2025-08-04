@@ -13,6 +13,7 @@ class StorageBase(metaclass=ABCMeta):
     """
     schema = None
     transtype = {}
+    snapshot_check_folder_modtime = True
 
     def __init__(self):
         self.storagehelper = StorageHelper()
@@ -214,7 +215,8 @@ class StorageBase(metaclass=ABCMeta):
                         return
 
                     # 增量检查：如果目录修改时间早于上次快照，跳过
-                    if (last_snapshot_time and
+                    if (self.snapshot_check_folder_modtime and
+                            last_snapshot_time and
                             _fileitm.modify_time and
                             _fileitm.modify_time <= last_snapshot_time):
                         return
@@ -225,11 +227,13 @@ class StorageBase(metaclass=ABCMeta):
                         __snapshot_file(sub_file, current_depth + 1)
                 else:
                     # 记录文件的完整信息用于比对
-                    files_info[_fileitm.path] = {
-                        'size': _fileitm.size or 0,
-                        'modify_time': getattr(_fileitm, 'modify_time', 0),
-                        'type': _fileitm.type
-                    }
+                    if getattr(_fileitm, 'modify_time', 0) > last_snapshot_time:
+                        files_info[_fileitm.path] = {
+                            'size': _fileitm.size or 0,
+                            'modify_time': getattr(_fileitm, 'modify_time', 0),
+                            'type': _fileitm.type
+                        }
+
             except Exception as e:
                 logger.debug(f"Snapshot error for {_fileitm.path}: {e}")
 

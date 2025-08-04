@@ -1,9 +1,10 @@
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Sequence, JSON
+from sqlalchemy import Column, Integer, String, Sequence, JSON, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from app.db import db_query, Base
+from app.db import db_query, Base, async_db_query
 
 
 class Message(Base):
@@ -34,7 +35,15 @@ class Message(Base):
     # 附件json
     note = Column(JSON)
 
-    @staticmethod
+    @classmethod
     @db_query
-    def list_by_page(db: Session, page: Optional[int] = 1, count: Optional[int] = 30):
-        return db.query(Message).order_by(Message.reg_time.desc()).offset((page - 1) * count).limit(count).all()
+    def list_by_page(cls, db: Session, page: Optional[int] = 1, count: Optional[int] = 30):
+        return db.query(cls).order_by(cls.reg_time.desc()).offset((page - 1) * count).limit(count).all()
+
+    @classmethod
+    @async_db_query
+    async def async_list_by_page(cls, db: AsyncSession, page: Optional[int] = 1, count: Optional[int] = 30):
+        result = await db.execute(
+            select(cls).order_by(cls.reg_time.desc()).offset((page - 1) * count).limit(count)
+        )
+        return result.scalars().all()

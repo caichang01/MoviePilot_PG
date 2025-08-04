@@ -1,31 +1,31 @@
 import sys
 
-from app.core.cache import close_cache
-from app.core.config import settings
-from app.core.module import ModuleManager
-from app.log import logger
-from app.utils.system import SystemUtils
-from app.command import CommandChain
-
 # SitesHelper涉及资源包拉取，提前引入并容错提示
 try:
-    from app.helper.sites import SitesHelper
+    from app.helper.sites import SitesHelper  # noqa
 except ImportError as e:
     SitesHelper = None
     error_message = f"错误: {str(e)}\n站点认证及索引相关资源导入失败，请尝试重建容器或手动拉取资源"
     print(error_message, file=sys.stderr)
     sys.exit(1)
 
+from app.utils.system import SystemUtils
+from app.log import logger
+from app.core.config import settings
+from app.core.cache import close_cache
+from app.core.module import ModuleManager
 from app.core.event import EventManager
 from app.helper.thread import ThreadHelper
 from app.helper.display import DisplayHelper
 from app.helper.doh import DohHelper
 from app.helper.resource import ResourceHelper
 from app.helper.message import MessageHelper
-from app.schemas import Notification, NotificationType
-from app.schemas.types import SystemConfigKey
+from app.helper.subscribe import SubscribeHelper
 from app.db import close_database
 from app.db.systemconfig_oper import SystemConfigOper
+from app.command import CommandChain
+from app.schemas import Notification, NotificationType
+from app.schemas.types import SystemConfigKey
 
 
 def start_frontend():
@@ -105,7 +105,7 @@ def check_auth():
         )
 
 
-def stop_modules():
+async def stop_modules():
     """
     服务关闭
     """
@@ -120,7 +120,7 @@ def stop_modules():
     # 停止缓存连接
     close_cache()
     # 停止数据库连接
-    close_database()
+    await close_database()
     # 停止前端服务
     stop_frontend()
     # 清理临时文件
@@ -145,6 +145,8 @@ def init_modules():
     ModuleManager()
     # 启动事件消费
     EventManager().start()
+    # 初始化订阅分享
+    SubscribeHelper()
     # 启动前端服务
     start_frontend()
     # 检查认证状态

@@ -35,6 +35,12 @@ class SiteOper(DbOper):
         """
         return Site.list(self._db)
 
+    async def async_list(self) -> List[Site]:
+        """
+        异步获取站点列表
+        """
+        return await Site.async_list(self._db)
+
     def list_order_by_pri(self) -> List[Site]:
         """
         获取站点列表
@@ -46,6 +52,12 @@ class SiteOper(DbOper):
         按状态获取站点列表
         """
         return Site.get_actives(self._db)
+
+    async def async_list_active(self) -> List[Site]:
+        """
+        异步按状态获取站点列表
+        """
+        return await Site.async_get_actives(self._db)
 
     def delete(self, sid: int):
         """
@@ -66,6 +78,12 @@ class SiteOper(DbOper):
         按域名获取站点
         """
         return Site.get_by_domain(self._db, domain)
+
+    async def async_get_by_domain(self, domain: str) -> Site:
+        """
+        异步按域名获取站点
+        """
+        return await Site.async_get_by_domain(self._db, domain)
 
     def get_domains_by_ids(self, ids: List[int]) -> List[str]:
         """
@@ -231,3 +249,62 @@ class SiteOper(DbOper):
                 lst_state=1,
                 lst_mod_date=lst_date
             ).create(self._db)
+
+    async def async_success(self, domain: str, seconds: Optional[int] = None):
+        """
+        异步站点访问成功
+        """
+        lst_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sta = await SiteStatistic.async_get_by_domain(self._db, domain)
+        if sta:
+            avg_seconds, note = None, {}
+            if seconds is not None:
+                note: dict = sta.note or {}
+                note[lst_date] = seconds or 1
+                avg_times = len(note.keys())
+                if avg_times > 10:
+                    note = dict(sorted(note.items(), key=lambda x: x[0], reverse=True)[:10])
+                avg_seconds = sum([v for v in note.values()]) // avg_times
+            await sta.async_update(self._db, {
+                "success": sta.success + 1,
+                "seconds": avg_seconds or sta.seconds,
+                "lst_state": 0,
+                "lst_mod_date": lst_date,
+                "note": note or sta.note
+            })
+        else:
+            note = {}
+            if seconds is not None:
+                note = {
+                    lst_date: seconds or 1
+                }
+            await SiteStatistic(
+                domain=domain,
+                success=1,
+                fail=0,
+                seconds=seconds or 1,
+                lst_state=0,
+                lst_mod_date=lst_date,
+                note=note
+            ).async_create(self._db)
+
+    async def async_fail(self, domain: str):
+        """
+        异步站点访问失败
+        """
+        lst_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sta = await SiteStatistic.async_get_by_domain(self._db, domain)
+        if sta:
+            await sta.async_update(self._db, {
+                "fail": sta.fail + 1,
+                "lst_state": 1,
+                "lst_mod_date": lst_date
+            })
+        else:
+            await SiteStatistic(
+                domain=domain,
+                success=0,
+                fail=1,
+                lst_state=1,
+                lst_mod_date=lst_date
+            ).async_create(self._db)

@@ -1,2 +1,2 @@
-APP_VERSION = 'v2.6.7-2-pg'
+APP_VERSION = 'v2.6.8-pg'
 FRONTEND_VERSION = 'v2.6.7'

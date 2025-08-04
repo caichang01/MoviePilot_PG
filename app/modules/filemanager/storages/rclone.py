@@ -26,6 +26,8 @@ class Rclone(StorageBase):
         "copy": "复制"
     }
 
+    snapshot_check_folder_modtime = settings.RCLONE_SNAPSHOT_CHECK_FOLDER_MODTIME
+
     def init_storage(self):
         """
         初始化
@@ -267,7 +269,7 @@ class Rclone(StorageBase):
             retcode = subprocess.run(
                 [
                     'rclone', 'copyto',
-                    str(path),
+                    path.as_posix(),
                     f'MP:{new_path}'
                 ],
                 startupinfo=self.__get_hidden_shell()

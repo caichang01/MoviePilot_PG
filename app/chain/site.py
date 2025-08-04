@@ -1,5 +1,4 @@
 import base64
-import gc
 import re
 from datetime import datetime
 from typing import Optional, Tuple, Union, Dict
@@ -9,7 +8,7 @@ from lxml import etree
 
 from app.chain import ChainBase
 from app.core.config import global_vars, settings
-from app.core.event import Event, EventManager, eventmanager
+from app.core.event import Event, eventmanager
 from app.db.models.site import Site
 from app.db.site_oper import SiteOper
 from app.db.systemconfig_oper import SystemConfigOper
@@ -18,7 +17,7 @@ from app.helper.cloudflare import under_challenge
 from app.helper.cookie import CookieHelper
 from app.helper.cookiecloud import CookieCloudHelper
 from app.helper.rss import RssHelper
-from app.helper.sites import SitesHelper
+from app.helper.sites import SitesHelper  # noqa
 from app.log import logger
 from app.schemas import MessageChannel, Notification, SiteUserData
 from app.schemas.types import EventType, NotificationType
@@ -59,7 +58,7 @@ class SiteChain(ChainBase):
                                        name=site.get("name"),
                                        payload=userdata.dict())
             # 发送事件
-            EventManager().send_event(EventType.SiteRefreshed, {
+            eventmanager.send_event(EventType.SiteRefreshed, {
                 "site_id": site.get("id")
             })
             # 发送站点消息
@@ -104,13 +103,9 @@ class SiteChain(ChainBase):
                     any_site_updated = True
                     result[site.get("name")] = userdata
         if any_site_updated:
-            EventManager().send_event(EventType.SiteRefreshed, {
+            eventmanager.send_event(EventType.SiteRefreshed, {
                 "site_id": "*"
             })
-
-        # 如果不是大内存模式，进行垃圾回收
-        if not settings.BIG_MEMORY_MODE:
-            gc.collect()
 
         return result
 
@@ -420,7 +415,7 @@ class SiteChain(ChainBase):
 
             # 通知站点更新
             if indexer:
-                EventManager().send_event(EventType.SiteUpdated, {
+                eventmanager.send_event(EventType.SiteUpdated, {
                     "domain": domain,
                 })
         # 处理完成
