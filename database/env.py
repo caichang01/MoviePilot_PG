@@ -26,24 +26,13 @@ def run_migrations_offline() -> None:
     """
     url = config.get_main_option("sqlalchemy.url")
     
-    # 根据数据库类型配置不同的参数
-    if url and "postgresql" in url:
-        # PostgreSQL配置
-        context.configure(
-            url=url,
-            target_metadata=target_metadata,
-            literal_binds=True,
-            dialect_opts={"paramstyle": "named"},
-        )
-    else:
-        # SQLite配置
-        context.configure(
-            url=url,
-            target_metadata=target_metadata,
-            literal_binds=True,
-            dialect_opts={"paramstyle": "named"},
-            render_as_batch=True
-        )
+    # 仅支持PostgreSQL配置
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
 
     with context.begin_transaction():
         context.run_migrations()
@@ -53,13 +42,8 @@ def run_migrations_online() -> None:
     if not db_url:
         raise ValueError("DATABASE_URL环境变量未设置")
         
-    # 根据数据库类型选择合适的poolclass
-    if db_url.startswith('postgresql'):
-        # PostgreSQL推荐使用QueuePool
-        pool_class = pool.QueuePool
-    else:
-        # 其他数据库使用NullPool
-        pool_class = pool.NullPool
+    # PostgreSQL推荐使用QueuePool
+    pool_class = pool.QueuePool
         
     connectable = engine_from_config(
         {"sqlalchemy.url": db_url},
@@ -70,20 +54,11 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         url = config.get_main_option("sqlalchemy.url")
         
-        # 根据数据库类型配置不同的参数
-        if url and "postgresql" in url:
-            # PostgreSQL配置
-            context.configure(
-                connection=connection, 
-                target_metadata=target_metadata
-            )
-        else:
-            # SQLite配置
-            context.configure(
-                connection=connection, 
-                target_metadata=target_metadata,
-                render_as_batch=True
-            )
+        # 仅支持PostgreSQL配置
+        context.configure(
+            connection=connection, 
+            target_metadata=target_metadata
+        )
 
         with context.begin_transaction():
             context.run_migrations()
