@@ -98,11 +98,9 @@ class ConfigModel(BaseModel):
 
     # ==================== 数据库配置 ====================
     # 数据库类型，支持 sqlite 和 postgresql，默认使用 sqlite
-    DB_TYPE: str = "sqlite"
+    DB_TYPE: str = "postgresql"
     # 是否在控制台输出 SQL 语句，默认关闭
     DB_ECHO: bool = False
-    # SQLite 的 busy_timeout 参数，默认为 60 秒
-    DB_TIMEOUT: int = 60
     # 数据库连接池类型，QueuePool, NullPool
     DB_POOL_TYPE: str = "QueuePool"
     # 是否在获取连接时进行预先 ping 操作
@@ -111,12 +109,12 @@ class ConfigModel(BaseModel):
     DB_POOL_RECYCLE: int = 300
     # 数据库连接池获取连接的超时时间（秒）
     DB_POOL_TIMEOUT: int = 30
-    # SQLite 连接池大小
-    DB_POOL_SIZE: int = 30
-    # SQLite 连接池溢出数量
-    DB_MAX_OVERFLOW: int = 50
-    # SQLite 是否启用 WAL 模式，默认开启
-    DB_WAL_ENABLE: bool = True
+    # PostgreSQL 连接池大小
+    DB_POSTGRESQL_POOL_SIZE: int = 30
+    # PostgreSQL 连接池溢出数量
+    DB_POSTGRESQL_MAX_OVERFLOW: int = 50
+
+    # 注意：以下配置项仅在未设置 DATABASE_URL 环境变量时使用
     # PostgreSQL 主机地址
     DB_POSTGRESQL_HOST: str = "localhost"
     # PostgreSQL 端口
@@ -127,10 +125,6 @@ class ConfigModel(BaseModel):
     DB_POSTGRESQL_USERNAME: str = "moviepilot"
     # PostgreSQL 密码
     DB_POSTGRESQL_PASSWORD: str = "moviepilot"
-    # PostgreSQL 连接池大小
-    DB_POSTGRESQL_POOL_SIZE: int = 30
-    # PostgreSQL 连接池溢出数量
-    DB_POSTGRESQL_MAX_OVERFLOW: int = 50
 
     # ==================== 缓存配置 ====================
     # 缓存类型，支持 cachetools 和 redis，默认使用 cachetools

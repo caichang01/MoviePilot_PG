@@ -47,11 +47,6 @@ def _get_database_engine(is_async: bool = False):
     """
     获取PostgreSQL数据库引擎，支持同步和异步
     """
-    if not DATABASE_URL:
-        raise ValueError("DATABASE_URL环境变量未设置")
-    
-    # 使用已解析的配置信息
-    
     # 根据池类型设置 poolclass 和相关参数
     if is_async:
         # 异步引擎使用 AsyncAdaptedQueuePool
