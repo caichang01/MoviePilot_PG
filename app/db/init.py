@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 
+from app.core.config import settings
 from app.db import Base, Engine, DB_CONFIG
 from app.log import logger
 
@@ -33,17 +34,19 @@ def update_db():
     if not db_url:
         logger.error("DATABASE_URL环境变量未设置")
         return
-        
+
+    script_location = settings.ROOT_PATH / 'database'
     try:
-        # 使用从DATABASE_URL解析出的配置
-        db_url = f"postgresql://{DB_CONFIG['username']}"
-        if DB_CONFIG.get('password'):
-            db_url += f":{DB_CONFIG['password']}"
-        db_url += f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-            
         alembic_cfg = Config()
+        alembic_cfg.set_main_option('script_location', str(script_location))
+
+        # 仅支持PostgreSQL，使用从DATABASE_URL解析出的配置
+        if DB_CONFIG.get('password'):
+            db_url = f"postgresql://{DB_CONFIG['username']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+        else:
+            db_url = f"postgresql://{DB_CONFIG['username']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+
         alembic_cfg.set_main_option('sqlalchemy.url', db_url)
-        alembic_cfg.set_main_option('script_location', str(DB_CONFIG['script_location']))
         upgrade(alembic_cfg, 'head')
     except Exception as e:
         logger.error(f'数据库更新失败：{str(e)}')
