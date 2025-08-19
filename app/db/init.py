@@ -39,13 +39,7 @@ def update_db():
     try:
         alembic_cfg = Config()
         alembic_cfg.set_main_option('script_location', str(script_location))
-
-        # 仅支持PostgreSQL，使用从DATABASE_URL解析出的配置
-        if DB_CONFIG.get('password'):
-            db_url = f"postgresql://{DB_CONFIG['username']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-        else:
-            db_url = f"postgresql://{DB_CONFIG['username']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-
+        # 直接使用DATABASE_URL环境变量
         alembic_cfg.set_main_option('sqlalchemy.url', db_url)
         upgrade(alembic_cfg, 'head')
     except Exception as e:

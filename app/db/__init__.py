@@ -18,10 +18,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL环境变量未设置")
 
-# 解析DATABASE_URL获取数据库连接信息
+# 解析DATABASE_URL获取数据库连接信息用于显示
 def _parse_database_url(url: str):
     """
-    解析数据库URL，提取连接信息
+    解析数据库URL，提取连接信息用于显示
     """
     parsed = urlparse(url)
     return {
