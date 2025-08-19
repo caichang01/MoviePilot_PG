@@ -170,9 +170,9 @@ class Plex:
         sections = self._plex.library.sections()
         movie_count = tv_count = episode_count = 0
         # 媒体库白名单
-        allow_library = [lib.id for lib in self.get_librarys(hidden=True)]
+        allow_library = [str(lib.id) for lib in self.get_librarys(hidden=True)]
         for sec in sections:
-            if sec.key not in allow_library:
+            if str(sec.key) not in allow_library:
                 continue
             if sec.type == "movie":
                 movie_count += sec.totalSize
@@ -379,7 +379,10 @@ class Plex:
             file_path = item.target_path
             lib_key, path = self.__find_librarie(file_path, self._libraries)
             # 如果存在同一剧集的多集,key(path)相同会合并
-            result_dict[path.as_posix()] = lib_key
+            if path:
+                result_dict[path.as_posix()] = lib_key
+            else:
+                result_dict[""] = lib_key
         if "" in result_dict:
             # 如果有匹配失败的,刷新整个库
             self._plex.library.update()

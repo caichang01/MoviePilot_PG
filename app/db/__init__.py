@@ -2,19 +2,31 @@ import os
 from typing import Any, Generator, List, Optional, Self, Tuple, Union, Sequence
 import asyncio
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, and_, select, delete
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import Session, as_declarative, declared_attr, scoped_session, sessionmaker
-from sqlalchemy import and_, select, delete
 from sqlalchemy.pool import NullPool, QueuePool, AsyncAdaptedQueuePool
 from sqlalchemy import inspect
 
 from app.core.config import settings
 
+
 # PostgreSQL数据库URL
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/moviepilot")
 IS_POSTGRESQL = True  # 固定为PostgreSQL
+
+def get_id_column():
+    """
+    根据数据库类型返回合适的ID列定义
+    """
+    if settings.DB_TYPE.lower() == "postgresql":
+        # PostgreSQL使用SERIAL类型，让数据库自动处理序列
+        return Column(Integer, Identity(start=1, cycle=True), primary_key=True, index=True)
+    else:
+        # SQLite使用Sequence
+        return Column(Integer, Sequence('id'), primary_key=True, index=True)
+
 
 def _get_database_engine(is_async: bool = False):
     """
@@ -41,40 +53,32 @@ def _get_database_engine(is_async: bool = False):
         # 当使用 QueuePool 时，添加 QueuePool 特有的参数
         if pool_class == QueuePool:
             db_kwargs.update({
-                "pool_size": settings.CONF.dbpool,
+                "pool_size": settings.DB_POSTGRESQL_POOL_SIZE,
                 "pool_timeout": settings.DB_POOL_TIMEOUT,
-                "max_overflow": settings.CONF.dbpooloverflow
+                "max_overflow": settings.DB_POSTGRESQL_MAX_OVERFLOW
             })
             
         # 创建数据库引擎
         engine = create_engine(**db_kwargs)
+        print(f"PostgreSQL database connected to {settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}")
+
         return engine
     else:
-        # 异步引擎配置
-        # 处理asyncpg URL格式
-        async_db_url = DATABASE_URL
-        if DATABASE_URL.startswith("postgresql://"):
-            async_db_url = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-        
-        # 数据库参数
+        # 构建异步PostgreSQL连接URL
+        async_db_url = f"postgresql+asyncpg://{settings.DB_POSTGRESQL_USERNAME}:{settings.DB_POSTGRESQL_PASSWORD}@{settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}"
+
+        # 数据库参数，只能使用 NullPool
         _db_kwargs = {
             "url": async_db_url,
             "pool_pre_ping": settings.DB_POOL_PRE_PING,
             "echo": settings.DB_ECHO,
-            "poolclass": pool_class,
-            "pool_recycle": settings.DB_POOL_RECYCLE
+            "poolclass": NullPool,
+            "pool_recycle": settings.DB_POOL_RECYCLE,
         }
-        
-        # 当使用 AsyncAdaptedQueuePool 时，添加特有参数
-        if pool_class == AsyncAdaptedQueuePool:
-            _db_kwargs.update({
-                "pool_size": settings.CONF.dbpool,
-                "pool_timeout": settings.DB_POOL_TIMEOUT,
-                "max_overflow": settings.CONF.dbpooloverflow
-            })
-        
         # 创建异步数据库引擎
         async_engine = create_async_engine(**_db_kwargs)
+        print(f"Async PostgreSQL database connected to {settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}")
+
         return async_engine
 
 

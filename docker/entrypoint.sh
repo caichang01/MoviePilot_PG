@@ -43,6 +43,16 @@ function load_config_from_app_env() {
         ["GITHUB_TOKEN"]=""
         ["MOVIEPILOT_AUTO_UPDATE"]="release"
 
+        # database
+        ["DB_TYPE"]="sqlite"
+        ["DB_POSTGRESQL_HOST"]="localhost"
+        ["DB_POSTGRESQL_PORT"]="5432"
+        ["DB_POSTGRESQL_DATABASE"]="moviepilot"
+        ["DB_POSTGRESQL_USERNAME"]="moviepilot"
+        ["DB_POSTGRESQL_PASSWORD"]="moviepilot"
+        ["DB_POSTGRESQL_POOL_SIZE"]="20"
+        ["DB_POSTGRESQL_MAX_OVERFLOW"]="30"
+
         # cert
         ["ENABLE_SSL"]="false"
         ["SSL_DOMAIN"]=""
@@ -195,13 +205,16 @@ fi
 
 # 使用 `envsubst` 将模板文件中的 ${NGINX_PORT} 替换为实际的环境变量值
 envsubst '${NGINX_PORT}${PORT}${NGINX_CLIENT_MAX_BODY_SIZE}${ENABLE_SSL}${HTTPS_SERVER_CONF}' < /etc/nginx/nginx.template.conf > /etc/nginx/nginx.conf
+
 # 自动更新
 cd /
 source /usr/local/bin/mp_update.sh
 cd /app || exit
+
 # 更改 moviepilot userid 和 groupid
 groupmod -o -g "${PGID}" moviepilot
 usermod -o -u "${PUID}" moviepilot
+
 # 更改文件权限
 chown -R moviepilot:moviepilot \
     "${HOME}" \
@@ -211,17 +224,21 @@ chown -R moviepilot:moviepilot \
     /var/lib/nginx \
     /var/log/nginx
 chown moviepilot:moviepilot /etc/hosts /tmp
+
 # 下载浏览器内核
 if [[ "$HTTPS_PROXY" =~ ^https?:// ]] || [[ "$HTTPS_PROXY" =~ ^https?:// ]] || [[ "$PROXY_HOST" =~ ^https?:// ]]; then
   HTTPS_PROXY="${HTTPS_PROXY:-${https_proxy:-$PROXY_HOST}}" gosu moviepilot:moviepilot playwright install chromium
 else
   gosu moviepilot:moviepilot playwright install chromium
 fi
+
 # 证书管理
 source /app/docker/cert.sh
+
 # 启动前端nginx服务
 INFO "→ 启动前端nginx服务..."
 nginx
+
 # 启动docker http proxy nginx
 if [ -S "/var/run/docker.sock" ]; then
     INFO "→ 启动 Docker Proxy..."
@@ -231,6 +248,7 @@ if [ -S "/var/run/docker.sock" ]; then
         /var/lib/nginx \
         /var/log/nginx
 fi
+
 # 设置后端服务权限掩码
 umask "${UMASK}"
 
