@@ -15,6 +15,24 @@ from app.core.config import settings
 
 # PostgreSQL数据库URL，必须从环境变量中获取
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL环境变量未设置")
+
+# 解析DATABASE_URL获取数据库连接信息
+def _parse_database_url(url: str):
+    """
+    解析数据库URL，提取连接信息
+    """
+    parsed = urlparse(url)
+    return {
+        'host': parsed.hostname or 'localhost',
+        'port': parsed.port or 5432,
+        'database': parsed.path.lstrip('/') if parsed.path else 'moviepilot',
+        'username': parsed.username or 'moviepilot',
+        'password': parsed.password
+    }
+
+DB_CONFIG = _parse_database_url(DATABASE_URL)
 IS_POSTGRESQL = True  # 固定为PostgreSQL
 
 def get_id_column():
@@ -32,11 +50,7 @@ def _get_database_engine(is_async: bool = False):
     if not DATABASE_URL:
         raise ValueError("DATABASE_URL环境变量未设置")
     
-    # 解析数据库URL以获取连接信息用于日志输出
-    parsed_url = urlparse(DATABASE_URL)
-    host = parsed_url.hostname or 'localhost'
-    port = parsed_url.port or 5432
-    database = parsed_url.path.lstrip('/') if parsed_url.path else 'moviepilot'
+    # 使用已解析的配置信息
     
     # 根据池类型设置 poolclass 和相关参数
     if is_async:
@@ -66,7 +80,7 @@ def _get_database_engine(is_async: bool = False):
             
         # 创建数据库引擎
         engine = create_engine(**db_kwargs)
-        print(f"PostgreSQL database connected to {host}:{port}/{database}")
+        print(f"PostgreSQL database connected to {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
 
         return engine
     else:
@@ -86,7 +100,7 @@ def _get_database_engine(is_async: bool = False):
         }
         # 创建异步数据库引擎
         async_engine = create_async_engine(**_db_kwargs)
-        print(f"Async PostgreSQL database connected to {host}:{port}/{database}")
+        print(f"Async PostgreSQL database connected to {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
 
         return async_engine
 

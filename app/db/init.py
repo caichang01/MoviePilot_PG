@@ -6,7 +6,7 @@ import os
 from urllib.parse import urlparse
 
 from app.core.config import settings
-from app.db import Base, Engine
+from app.db import Base, Engine, DB_CONFIG
 from app.log import logger
 
 # 全局Session工厂
@@ -46,11 +46,11 @@ def update_db():
     try:
         alembic_cfg = Config()
         alembic_cfg.set_main_option('script_location', str(script_location))
-        # 仅支持PostgreSQL
-        if settings.DB_POSTGRESQL_PASSWORD:
-            db_url = f"postgresql://{settings.DB_POSTGRESQL_USERNAME}:{settings.DB_POSTGRESQL_PASSWORD}@{host}:{port}/{database}"
+        # 仅支持PostgreSQL，使用从DATABASE_URL解析出的配置
+        if DB_CONFIG.get('password'):
+            db_url = f"postgresql://{DB_CONFIG['username']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
         else:
-            db_url = f"postgresql://{settings.DB_POSTGRESQL_USERNAME}@{host}:{port}/{database}"
+            db_url = f"postgresql://{DB_CONFIG['username']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
             
         alembic_cfg.set_main_option('sqlalchemy.url', db_url)
         upgrade(alembic_cfg, 'head')
