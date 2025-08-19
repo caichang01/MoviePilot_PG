@@ -1,6 +1,7 @@
 import os
 from typing import Any, Generator, List, Optional, Self, Tuple, Union, Sequence
 import asyncio
+from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, text, and_, select, delete, Column, Integer, Identity
 from sqlalchemy.engine import Engine
@@ -12,8 +13,8 @@ from sqlalchemy import inspect
 from app.core.config import settings
 
 
-# PostgreSQL数据库URL
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost/moviepilot")
+# PostgreSQL数据库URL，必须从环境变量中获取
+DATABASE_URL = os.getenv("DATABASE_URL")
 IS_POSTGRESQL = True  # 固定为PostgreSQL
 
 def get_id_column():
@@ -28,6 +29,15 @@ def _get_database_engine(is_async: bool = False):
     """
     获取PostgreSQL数据库引擎，支持同步和异步
     """
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL环境变量未设置")
+    
+    # 解析数据库URL以获取连接信息用于日志输出
+    parsed_url = urlparse(DATABASE_URL)
+    host = parsed_url.hostname or 'localhost'
+    port = parsed_url.port or 5432
+    database = parsed_url.path.lstrip('/') if parsed_url.path else 'moviepilot'
+    
     # 根据池类型设置 poolclass 和相关参数
     if is_async:
         # 异步引擎使用 AsyncAdaptedQueuePool
@@ -56,13 +66,16 @@ def _get_database_engine(is_async: bool = False):
             
         # 创建数据库引擎
         engine = create_engine(**db_kwargs)
-        print(f"PostgreSQL database connected to {settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}")
+        print(f"PostgreSQL database connected to {host}:{port}/{database}")
 
         return engine
     else:
-        # 构建异步PostgreSQL连接URL
-        async_db_url = f"postgresql+asyncpg://{settings.DB_POSTGRESQL_USERNAME}:{settings.DB_POSTGRESQL_PASSWORD}@{settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}"
-
+        # 异步引擎配置
+        # 处理asyncpg URL格式
+        async_db_url = DATABASE_URL
+        if DATABASE_URL.startswith("postgresql://"):
+            async_db_url = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+        
         # 数据库参数，只能使用 NullPool
         _db_kwargs = {
             "url": async_db_url,
@@ -73,7 +86,7 @@ def _get_database_engine(is_async: bool = False):
         }
         # 创建异步数据库引擎
         async_engine = create_async_engine(**_db_kwargs)
-        print(f"Async PostgreSQL database connected to {settings.DB_POSTGRESQL_HOST}:{settings.DB_POSTGRESQL_PORT}/{settings.DB_POSTGRESQL_DATABASE}")
+        print(f"Async PostgreSQL database connected to {host}:{port}/{database}")
 
         return async_engine
 
