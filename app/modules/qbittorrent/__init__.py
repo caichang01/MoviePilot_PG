@@ -5,10 +5,10 @@ from qbittorrentapi import TorrentFilesList
 from torrentool.torrent import Torrent
 
 from app import schemas
-from app.core.cache import get_file_cache_backend
+from app.core.cache import FileCache
 from app.core.config import settings
-from app.core.metainfo import MetaInfo
 from app.core.event import eventmanager, Event
+from app.core.metainfo import MetaInfo
 from app.log import logger
 from app.modules import _ModuleBase, _DownloaderBase
 from app.modules.qbittorrent.qbittorrent import Qbittorrent
@@ -118,15 +118,17 @@ class QbittorrentModule(_ModuleBase, _DownloaderBase[Qbittorrent]):
                     if content.exists():
                         torrent_content = content.read_bytes()
                     else:
-                        # 缓存处理器
-                        cache_backend = get_file_cache_backend()
                         # 读取缓存的种子文件
-                        torrent_content = cache_backend.get(content.as_posix(), region="torrents")
+                        torrent_content = FileCache().get(content.as_posix(), region="torrents")
                 else:
                     torrent_content = content
 
                 if torrent_content:
-                    torrent_info = Torrent.from_string(torrent_content)
+                    # 检查是否为磁力链接
+                    if StringUtils.is_magnet_link(torrent_content):
+                        return None, torrent_content
+                    else:
+                        torrent_info = Torrent.from_string(torrent_content)
 
                 return torrent_info, torrent_content
             except Exception as e:
@@ -137,8 +139,12 @@ class QbittorrentModule(_ModuleBase, _DownloaderBase[Qbittorrent]):
             return None, None, None, "下载内容为空"
 
         # 读取种子的名称
-        torrent,  content = __get_torrent_info()
-        if not torrent:
+        torrent, content = __get_torrent_info()
+        # 检查是否为磁力链接
+        is_magnet = isinstance(content, str) and content.startswith("magnet:") or isinstance(content,
+                                                                                             bytes) and content.startswith(
+            b"magnet:")
+        if not torrent and not is_magnet:
             return None, None, None, f"添加种子任务失败：无法读取种子文件"
 
         # 获取下载器
@@ -337,7 +343,7 @@ class QbittorrentModule(_ModuleBase, _DownloaderBase[Qbittorrent]):
                     del torrents
         else:
             return None
-        return ret_torrents # noqa
+        return ret_torrents  # noqa
 
     def transfer_completed(self, hashs: str, downloader: Optional[str] = None) -> None:
         """
