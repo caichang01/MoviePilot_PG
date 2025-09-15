@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import inspect
 import random
@@ -71,15 +72,26 @@ class EventManager(metaclass=Singleton):
     """
 
     def __init__(self):
-        self.__executor = ThreadHelper()  # 动态线程池，用于消费事件
-        self.__consumer_threads = []  # 用于保存启动的事件消费者线程
-        self.__event_queue = PriorityQueue()  # 优先级队列
-        self.__broadcast_subscribers: Dict[EventType, Dict[str, Callable]] = {}  # 广播事件的订阅者
-        self.__chain_subscribers: Dict[ChainEventType, Dict[str, tuple[int, Callable]]] = {}  # 链式事件的订阅者
-        self.__disabled_handlers = set()  # 禁用的事件处理器集合
-        self.__disabled_classes = set()  # 禁用的事件处理器类集合
-        self.__lock = threading.Lock()  # 线程锁
-        self.__event = threading.Event()  # 退出事件
+        # 动态线程池，用于消费事件
+        self.__executor = ThreadHelper()
+        # 用于保存启动的事件消费者线程
+        self.__consumer_threads = []
+        # 优先级队列
+        self.__event_queue = PriorityQueue()
+        # 广播事件的订阅者
+        self.__broadcast_subscribers: Dict[EventType, Dict[str, Callable]] = {}
+        # 链式事件的订阅者
+        self.__chain_subscribers: Dict[ChainEventType, Dict[str, tuple[int, Callable]]] = {}
+        # 禁用的事件处理器集合
+        self.__disabled_handlers = set()
+        # 禁用的事件处理器类集合
+        self.__disabled_classes = set()
+        # 线程锁
+        self.__lock = threading.Lock()
+        # 退出事件
+        self.__event = threading.Event()
+        # 当前事件循环
+        self.loop = asyncio.get_event_loop()
 
     def start(self):
         """
@@ -438,7 +450,15 @@ class EventManager(metaclass=Singleton):
             isolated_event = Event(event_type=event.event_type,
                                    event_data=event_data_copy,
                                    priority=event.priority)
-            self.__executor.submit(self.__safe_invoke_handler, handler, isolated_event)
+            if inspect.iscoroutinefunction(handler):
+                # 对于异步函数，直接在事件循环中运行
+                asyncio.run_coroutine_threadsafe(
+                    self.__safe_invoke_handler_async(handler, isolated_event),
+                    self.loop
+                )
+            else:
+                # 对于同步函数，在线程池中运行
+                self.__executor.submit(self.__safe_invoke_handler, handler, isolated_event)
 
     def __safe_invoke_handler(self, handler: Callable, event: Event):
         """
@@ -450,10 +470,7 @@ class EventManager(metaclass=Singleton):
             logger.debug(f"Handler {self.__get_handler_identifier(handler)} is disabled. Skipping execution")
             return
 
-        try:
-            self.__invoke_handler_by_type_sync(handler, event)
-        except Exception as e:
-            self.__handle_event_error(event, handler, e)
+        self.__invoke_handler_by_type_sync(handler, event)
 
     async def __safe_invoke_handler_async(self, handler: Callable, event: Event):
         """
@@ -465,10 +482,7 @@ class EventManager(metaclass=Singleton):
             logger.debug(f"Handler {self.__get_handler_identifier(handler)} is disabled. Skipping execution")
             return
 
-        try:
-            await self.__invoke_handler_by_type_async(handler, event)
-        except Exception as e:
-            self.__handle_event_error(event, handler, e)
+        await self.__invoke_handler_by_type_async(handler, event)
 
     def __invoke_handler_by_type_sync(self, handler: Callable, event: Event):
         """
@@ -486,7 +500,17 @@ class EventManager(metaclass=Singleton):
 
         if class_name in plugin_manager.get_plugin_ids():
             # 插件处理器
-            plugin_manager.run_plugin_method(class_name, method_name, event)
+            plugin = plugin_manager.running_plugins.get(class_name)
+            if not plugin:
+                return
+            method = getattr(plugin, method_name, None)
+            if not method:
+                return
+            try:
+                method(event)
+            except Exception as e:
+                self.__handle_event_error(event=event, module_name=plugin.name,
+                                          class_name=class_name, method_name=method_name, e=e)
         elif class_name in module_manager.get_module_ids():
             # 模块处理器
             module = module_manager.get_running_module(class_name)
@@ -495,16 +519,24 @@ class EventManager(metaclass=Singleton):
             method = getattr(module, method_name, None)
             if not method:
                 return
-            method(event)
+            try:
+                method(event)
+            except Exception as e:
+                self.__handle_event_error(event=event, module_name=module.get_name(),
+                                          class_name=class_name, method_name=method_name, e=e)
         else:
             # 全局处理器
             class_obj = self.__get_class_instance(class_name)
             if not class_obj or not hasattr(class_obj, method_name):
                 return
-            method = getattr(class_obj, method_name)
+            method = getattr(class_obj, method_name, None)
             if not method:
                 return
-            method(event)
+            try:
+                method(event)
+            except Exception as e:
+                self.__handle_event_error(event=event, module_name=class_name,
+                                          class_name=class_name, method_name=method_name, e=e)
 
     async def __invoke_handler_by_type_async(self, handler: Callable, event: Event):
         """
@@ -537,52 +569,62 @@ class EventManager(metaclass=Singleton):
         names = handler.__qualname__.split(".")
         return names[0], names[1]
 
-    @staticmethod
-    async def __invoke_plugin_method_async(handler: Any, class_name: str, method_name: str, event: Event):
+    async def __invoke_plugin_method_async(self, handler: Any, class_name: str, method_name: str, event: Event):
         """
         异步调用插件方法
         """
         plugin = handler.running_plugins.get(class_name)
-        if plugin and hasattr(plugin, method_name):
-            method = getattr(plugin, method_name)
+        if not plugin:
+            return
+        method = getattr(plugin, method_name, None)
+        if not method:
+            return
+        try:
             if inspect.iscoroutinefunction(method):
                 await method(event)
             else:
                 # 插件同步函数在异步环境中运行，避免阻塞
                 await run_in_threadpool(method, event)
+        except Exception as e:
+            self.__handle_event_error(event=event, handler=handler, e=e, module_name=plugin.name)
 
-    @staticmethod
-    async def __invoke_module_method_async(handler: Any, class_name: str, method_name: str, event: Event):
+    async def __invoke_module_method_async(self, handler: Any, class_name: str, method_name: str, event: Event):
         """
         异步调用模块方法
         """
         module = handler.get_running_module(class_name)
         if not module:
             return
-
         method = getattr(module, method_name, None)
         if not method:
             return
-
-        if inspect.iscoroutinefunction(method):
-            await method(event)
-        else:
-            method(event)
+        try:
+            if inspect.iscoroutinefunction(method):
+                await method(event)
+            else:
+                method(event)
+        except Exception as e:
+            self.__handle_event_error(event=event, module_name=module.get_name(),
+                                      class_name=class_name, method_name=method_name, e=e)
 
     async def __invoke_global_method_async(self, class_name: str, method_name: str, event: Event):
         """
         异步调用全局对象方法
         """
         class_obj = self.__get_class_instance(class_name)
-        if not class_obj or not hasattr(class_obj, method_name):
+        if not class_obj:
             return
-
-        method = getattr(class_obj, method_name)
-
-        if inspect.iscoroutinefunction(method):
-            await method(event)
-        else:
-            method(event)
+        method = getattr(class_obj, method_name, None)
+        if not method:
+            return
+        try:
+            if inspect.iscoroutinefunction(method):
+                await method(event)
+            else:
+                method(event)
+        except Exception as e:
+            self.__handle_event_error(event=event, module_name=class_name,
+                                      class_name=class_name, method_name=method_name, e=e)
 
     @staticmethod
     def __get_class_instance(class_name: str):
@@ -609,7 +651,11 @@ class EventManager(metaclass=Singleton):
                 module_name = f"app.chain.{class_name[:-5].lower()}"
                 module = importlib.import_module(module_name)
             elif class_name.endswith("Helper"):
-                module_name = f"app.helper.{class_name[:-6].lower()}"
+                # 特殊处理 Async 类
+                if class_name.startswith("Async"):
+                    module_name = f"app.helper.{class_name[5:-6].lower()}"
+                else:
+                    module_name = f"app.helper.{class_name[:-6].lower()}"
                 module = importlib.import_module(module_name)
             else:
                 module_name = f"app.{class_name.lower()}"
@@ -649,18 +695,16 @@ class EventManager(metaclass=Singleton):
         """
         logger.debug(f"{stage} - {event}")
 
-    def __handle_event_error(self, event: Event, handler: Callable, e: Exception):
+    def __handle_event_error(self, event: Event, module_name: str,
+                             class_name: str, method_name: str, e: Exception):
         """
         全局错误处理器，用于处理事件处理中的异常
         """
-        logger.error(f"事件处理出错：{str(e)} - {traceback.format_exc()}")
-
-        names = handler.__qualname__.split(".")
-        class_name, method_name = names[0], names[1]
+        logger.error(f"{module_name} 事件处理出错：{str(e)} - {traceback.format_exc()}")
 
         # 发送系统错误通知
         from app.helper.message import MessageHelper
-        MessageHelper().put(title=f"{event.event_type} 事件处理出错",
+        MessageHelper().put(title=f"{module_name} 处理事件 {event.event_type} 时出错",
                             message=f"{class_name}.{method_name}：{str(e)}",
                             role="system")
         self.send_event(

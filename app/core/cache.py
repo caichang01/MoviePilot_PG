@@ -455,7 +455,7 @@ class MemoryBackend(CacheBackend):
             if region_cache:
                 with lock:
                     region_cache.clear()
-                logger.info(f"Cleared cache for region: {region}")
+                logger.debug(f"Cleared cache for region: {region}")
         else:
             # 清除所有区域的缓存
             for region_cache in self._region_caches.values():
@@ -474,7 +474,11 @@ class MemoryBackend(CacheBackend):
         if region_cache is None:
             yield from ()
             return
-        for item in region_cache.items():
+        # 使用锁保护迭代过程，避免在迭代时缓存被修改
+        with lock:
+            # 创建快照避免并发修改问题
+            items_snapshot = list(region_cache.items())
+        for item in items_snapshot:
             yield item
 
     def close(self) -> None:
@@ -585,13 +589,13 @@ class AsyncMemoryBackend(AsyncCacheBackend):
             if region_cache:
                 with lock:
                     region_cache.clear()
-                logger.info(f"Cleared cache for region: {region}")
+                logger.debug(f"Cleared cache for region: {region}")
         else:
             # 清除所有区域的缓存
             for region_cache in self._region_caches.values():
                 with lock:
                     region_cache.clear()
-            logger.info("Cleared all cache")
+            logger.info("All cache cleared！")
 
     async def items(self, region: Optional[str] = DEFAULT_CACHE_REGION) -> AsyncGenerator[Tuple[str, Any], None]:
         """
@@ -603,7 +607,11 @@ class AsyncMemoryBackend(AsyncCacheBackend):
         region_cache = self.__get_region_cache(region)
         if region_cache is None:
             return
-        for item in region_cache.items():
+        # 使用锁保护迭代过程，避免在迭代时缓存被修改
+        with lock:
+            # 创建快照避免并发修改问题
+            items_snapshot = list(region_cache.items())
+        for item in items_snapshot:
             yield item
 
     async def close(self) -> None:
@@ -1385,7 +1393,7 @@ class TTLCache(CacheProxy):
     def __init__(self,
                  region: Optional[str] = DEFAULT_CACHE_REGION,
                  maxsize: Optional[int] = DEFAULT_CACHE_SIZE,
-                 ttl: Optional[int]= DEFAULT_CACHE_TTL):
+                 ttl: Optional[int] = DEFAULT_CACHE_TTL):
         """
         初始化 TTL 缓存
 
@@ -1404,7 +1412,7 @@ class LRUCache(CacheProxy):
 
     def __init__(self,
                  region: Optional[str] = DEFAULT_CACHE_REGION,
-                 maxsize: Optional[int]= DEFAULT_CACHE_SIZE
+                 maxsize: Optional[int] = DEFAULT_CACHE_SIZE
                  ):
         """
         初始化 LRU 缓存
